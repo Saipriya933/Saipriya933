@@ -1,0 +1,68 @@
+import socket
+import requests
+from concurrent.futures import ThreadPoolExecutor
+
+
+def scan_open_ports(host, ports):
+    """Scan common ports on a given host to see if they are open."""
+    open_ports = []
+
+    def check_port(port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            result = sock.connect_ex((host, port))
+            if result == 0:
+                open_ports.append(port)
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        executor.map(check_port, ports)
+
+    return open_ports
+
+
+def check_software_version(url, known_vulnerabilities):
+    """Check if the software version running on the site is outdated or vulnerable."""
+    try:
+        response = requests.get(url)
+        server_header = response.headers.get('Server', '')
+        for software, vuln_versions in known_vulnerabilities.items():
+            if software in server_header:
+                for vuln_version in vuln_versions:
+                    if vuln_version in server_header:
+                        return f"Vulnerable software detected: {software} {vuln_version}"
+        return "No known vulnerabilities detected."
+    except requests.exceptions.RequestException as e:
+        return f"Error scanning the website: {e}"
+
+
+def scan_website(url):
+    """Scan the website for common misconfigurations and vulnerabilities."""
+    common_vulnerabilities = {
+        "Apache": ["2.4.49", "2.4.48"],  # Example vulnerable versions
+        "Nginx": ["1.21.0", "1.20.1"],  # Example vulnerable versions
+        "OpenSSL": ["1.0.2", "1.1.0"],  # Example vulnerable versions
+    }
+    return check_software_version(url, common_vulnerabilities)
+
+
+def scan_network(host):
+    """Scan a host for open ports and possible vulnerabilities."""
+    # Common ports to scan
+    common_ports = [22, 80, 443, 3306, 8080]
+    print(f"Scanning {host} for open ports...")
+    open_ports = scan_open_ports(host, common_ports)
+    if open_ports:
+        print(f"Open ports found: {open_ports}")
+    else:
+        print("No open ports found.")
+
+    # Checking for known software vulnerabilities
+    url = f"http://{host}"
+    print(f"Scanning {url} for known vulnerabilities...")
+    vulnerability_report = scan_website(url)
+    print(vulnerability_report)
+
+
+if __name__ == "__main__":
+    target_host = input("Enter the host or IP to scan: ")
+    scan_network(target_host)
